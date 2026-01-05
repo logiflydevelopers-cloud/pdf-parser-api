@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+celery
+redis
+pypdf
+pdf2image
+pytesseract
+langchain-openai
+pinecone
+google-cloud-firestore
+requests
+python-dotenv
