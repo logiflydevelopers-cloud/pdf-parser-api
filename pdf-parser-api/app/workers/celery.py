@@ -4,7 +4,8 @@ import os
 celery = Celery(
     "worker",
     broker=os.environ["REDIS_URL"],
-    backend=os.environ["REDIS_URL"]
+    backend=os.environ["REDIS_URL"],
 )
 
-celery.autodiscover_tasks(["app.workers"])
+# FORCE IMPORT OF TASKS
+import app.workers.ingest_task
