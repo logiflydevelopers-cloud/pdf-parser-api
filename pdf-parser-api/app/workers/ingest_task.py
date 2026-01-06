@@ -7,22 +7,30 @@ from app.repos.redis_jobs import get_job_repo
 from app.repos.firestore_repo import FirestoreRepo
 
 
-def _ingest_logic(jobId: str, pdfId: str, source: dict):
+def _ingest_logic(jobId: str, userId: str, pdfId: str, source: dict):
     """
     Core ingestion logic.
-    Can be called:
-    - synchronously (local dev)
-    - asynchronously via Celery (production)
+    Works for:
+    - Local sync execution
+    - Celery async execution
     """
     jobs = get_job_repo()
     store = FirestoreRepo()
 
     try:
+        # mark job as processing
+        jobs.update(
+            jobId,
+            status="processing",
+            stage="download",
+            progress=5
+        )
+
         # ------------------
         # DOWNLOAD
         # ------------------
-        jobs.update(jobId, stage="download", progress=10)
         pdf_bytes = download_pdf(source)
+        jobs.update(jobId, progress=15)
 
         # ------------------
         # EXTRACT / OCR
@@ -35,11 +43,10 @@ def _ingest_logic(jobId: str, pdfId: str, source: dict):
         # ------------------
         jobs.update(jobId, stage="embed", progress=60)
         build_embeddings(
-        userId=userId,
-        pdfId=pdfId,
-        page_texts=texts
+            userId=userId,
+            pdfId=pdfId,
+            page_texts=texts
         )
-
 
         # ------------------
         # SUMMARY
@@ -51,6 +58,7 @@ def _ingest_logic(jobId: str, pdfId: str, source: dict):
         # SAVE RESULT
         # ------------------
         store.save(pdfId, {
+            "userId": userId,
             "summary": summary,
             "meta": {
                 "pages": pages,
@@ -60,6 +68,7 @@ def _ingest_logic(jobId: str, pdfId: str, source: dict):
             "status": "ready"
         })
 
+        # mark job done
         jobs.complete(jobId)
 
     except Exception as e:
@@ -69,10 +78,5 @@ def _ingest_logic(jobId: str, pdfId: str, source: dict):
 
 
 @celery.task(bind=True, name="ingest_pdf")
-def ingest_pdf(self, jobId: str, pdfId: str, source: dict):
-    """
-    Celery task wrapper.
-    Production only.
-    """
-    return _ingest_logic(jobId, pdfId, source)
-
+def ingest_pdf(self, jobId: str, userId: str, pdfId: str, source: dict):
+    return _ingest_logic(jobId, userId, pdfId, source)
