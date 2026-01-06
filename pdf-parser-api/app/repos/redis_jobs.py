@@ -2,13 +2,10 @@ import json
 import uuid
 import os
 from datetime import datetime
-from dotenv import load_dotenv
-load_dotenv()  
 
-USE_CELERY = os.getenv("USE_CELERY", "true").lower() == "true"
 
 # -------------------------------------------------
-# In-memory fallback (LOCAL DEV)
+# In-memory fallback (LOCAL ONLY)
 # -------------------------------------------------
 _IN_MEMORY_JOBS = {}
 
@@ -45,15 +42,14 @@ class InMemoryJobRepo:
 
 
 # -------------------------------------------------
-# Redis-backed repo (PRODUCTION)
+# Redis-backed repo (PRODUCTION + CELERY)
 # -------------------------------------------------
 class RedisJobRepo:
     def __init__(self):
-        import redis  # lazy import (IMPORTANT)
+        import redis
         redis_url = os.environ.get("REDIS_URL")
         if not redis_url:
-            raise RuntimeError("REDIS_URL is required in production")
-
+            raise RuntimeError("REDIS_URL missing")
         self.client = redis.from_url(redis_url, decode_responses=True)
 
     def create(self, pdfId: str):
@@ -92,12 +88,12 @@ class RedisJobRepo:
 
 
 # -------------------------------------------------
-# Factory (used everywhere)
+# FACTORY (FIXED)
 # -------------------------------------------------
 def get_job_repo():
     """
-    Returns the correct job repo based on environment.
+    If REDIS_URL exists → ALWAYS Redis
     """
-    if USE_CELERY:
+    if os.getenv("REDIS_URL"):
         return RedisJobRepo()
     return InMemoryJobRepo()
