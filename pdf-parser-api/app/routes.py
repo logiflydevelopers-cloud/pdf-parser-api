@@ -23,23 +23,25 @@ def ingest(req: IngestRequest):
     job = jobs.create(req.pdfId)
 
     if USE_CELERY:
-        # Production (Render)
+        # Production (Render + Celery)
         ingest_pdf_task.delay(
             job["jobId"],
+            req.userId,
             req.pdfId,
             req.source.dict()
         )
     else:
-        # Local dev (NO Redis, NO Celery)
+        # Local dev (no Celery)
         ingest_pdf_task(
             job["jobId"],
+            req.userId,
             req.pdfId,
             req.source.dict()
         )
 
     return {
-        "pdfId": req.pdfId,
         "jobId": job["jobId"],
+        "pdfId": req.pdfId,
         "status": "queued"
     }
 
@@ -55,20 +57,19 @@ def job_status(jobId: str):
         raise HTTPException(status_code=404, detail="Job not found")
 
     if data["status"] == "done":
-        result = store.get(data["pdfId"])
-        data["result"] = result
+        data["result"] = store.get(data["pdfId"])
 
     return data
 
 
 # --------------------------------------------------
-# Ask question (summary → RAG)
+# Ask question (RAG)
 # --------------------------------------------------
 @router.post("/pdfs/{pdfId}/ask")
 def ask(pdfId: str, req: AskRequest):
     data = store.get(pdfId)
 
-    if not data or "summary" not in data:
+    if not data:
         raise HTTPException(
             status_code=404,
             detail="PDF not processed or not found"
