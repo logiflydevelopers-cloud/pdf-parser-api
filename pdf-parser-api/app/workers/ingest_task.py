@@ -34,7 +34,12 @@ def _ingest_logic(jobId: str, pdfId: str, source: dict):
         # EMBEDDINGS (Pinecone)
         # ------------------
         jobs.update(jobId, stage="embed", progress=60)
-        build_embeddings(pdfId, texts)
+        build_embeddings(
+        userId=userId,
+        pdfId=pdfId,
+        page_texts=texts
+        )
+
 
         # ------------------
         # SUMMARY
@@ -70,3 +75,4 @@ def ingest_pdf(self, jobId: str, pdfId: str, source: dict):
     Production only.
     """
     return _ingest_logic(jobId, pdfId, source)
+
