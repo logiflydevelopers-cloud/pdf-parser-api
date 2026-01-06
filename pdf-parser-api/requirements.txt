@@ -10,3 +10,5 @@ pinecone
 google-cloud-firestore
 requests
 python-dotenv
+langchain-text-splitters
+
